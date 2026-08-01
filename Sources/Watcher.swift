@@ -37,10 +37,9 @@ struct WatchedFile {
 
 final class Watcher {
 
-    // TODO: switch to real Downloads + Desktop once the painter has been
-    // confirmed safe against ~/FridgeTest. See CLAUDE.md safety rules.
     var scopes: [URL] = [
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("FridgeTest", isDirectory: true)
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true),
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true),
     ]
 
     /// Called whenever a scan produces a fresh file list.
