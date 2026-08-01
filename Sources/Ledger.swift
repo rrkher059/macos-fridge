@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 
 /// Remembers every file we have ever seen.
 ///
@@ -13,7 +12,7 @@ enum Bucket: String, Codable {
 }
 
 struct LedgerEntry: Codable {
-    /// The file's ORIGINAL icon, captured the first time we saw it.
+    /// The file's ORIGINAL icon, captured the first time we saw it, as PNG data.
     /// Every paint starts from this. Never re-read the live icon.
     var cleanIconPNG: Data
 
@@ -23,56 +22,89 @@ struct LedgerEntry: Codable {
     var firstSeen: Date
 }
 
+/// On-disk shape. See CLAUDE.md for the JSON layout.
+private struct LedgerFile: Codable {
+    var version: Int
+    var files: [String: LedgerEntry]
+}
+
 final class Ledger {
 
     private(set) var entries: [String: LedgerEntry] = [:]
+
+    private static let currentVersion = 1
 
     // MARK: - Disk
 
     /// Path to ledger.json. Creates the containing folder if missing.
     static var storeURL: URL {
-        // TODO
-        fatalError("unimplemented")
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0]
+        let dir = appSupport.appendingPathComponent("Fridge", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("ledger.json")
     }
 
     /// Load from disk. Empty ledger if the file does not exist yet.
     func load() throws {
-        // TODO
+        let url = Self.storeURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            entries = [:]
+            return
+        }
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let file = try decoder.decode(LedgerFile.self, from: data)
+        entries = file.files
     }
 
     /// Write to disk. Call at the end of every loop.
     func save() throws {
-        // TODO
+        let file = LedgerFile(version: Self.currentVersion, files: entries)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(file)
+        try data.write(to: Self.storeURL, options: .atomic)
     }
 
     // MARK: - Entries
 
     func entry(for path: String) -> LedgerEntry? {
-        // TODO
-        return nil
+        entries[path]
     }
 
     /// First sighting. Snapshots the clean icon. Does nothing if already known.
-    func register(path: String, cleanIcon: NSImage, lastUsed: Date) {
-        // TODO
+    func register(path: String, cleanIconPNG: Data, lastUsed: Date) {
+        guard entries[path] == nil else { return }
+        entries[path] = LedgerEntry(
+            cleanIconPNG: cleanIconPNG,
+            lastUsed: lastUsed,
+            currentBucket: .fresh,
+            frozen: false,
+            firstSeen: Date()
+        )
     }
 
     func updateBucket(path: String, to bucket: Bucket) {
-        // TODO
+        guard entries[path] != nil else { return }
+        entries[path]?.currentBucket = bucket
     }
 
     func setFrozen(path: String, frozen: Bool) {
-        // TODO
+        guard entries[path] != nil else { return }
+        entries[path]?.frozen = frozen
     }
 
     /// File no longer exists on disk. Drop it.
     func forget(path: String) {
-        // TODO
+        entries.removeValue(forKey: path)
     }
 
     /// Every path we know about. Used by "Unmold all".
     var allPaths: [String] {
-        // TODO
-        return []
+        Array(entries.keys)
     }
 }

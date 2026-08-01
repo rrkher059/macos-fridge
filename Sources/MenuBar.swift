@@ -39,9 +39,12 @@ final class MenuBarController: NSObject {
     }
 
     private func bucket(forDaysOld days: Int) -> Bucket {
-        // 0-13 fresh, 14-20 spotty, 21-29 moldy, 30+ fuzzy
-        // TODO
-        return .fresh
+        switch days {
+        case ..<14: return .fresh
+        case 14..<21: return .spotty
+        case 21..<30: return .moldy
+        default: return .fuzzy
+        }
     }
 
     // MARK: - Actions
