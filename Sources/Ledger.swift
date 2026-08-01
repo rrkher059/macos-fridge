@@ -1,5 +1,7 @@
 import Foundation
 
+// TIER 1 — pure logic, no OS calls. Reviewed but never compiled.
+
 /// Remembers every file we have ever seen.
 ///
 /// This is the single source of truth. If a file is not in here, we have
@@ -40,7 +42,7 @@ final class Ledger {
     static var storeURL: URL {
         let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask
-        )[0]
+        ).first ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
         let dir = appSupport.appendingPathComponent("Fridge", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("ledger.json")
@@ -91,6 +93,13 @@ final class Ledger {
     func updateBucket(path: String, to bucket: Bucket) {
         guard entries[path] != nil else { return }
         entries[path]?.currentBucket = bucket
+    }
+
+    /// Refresh the tracked lastUsed value from a fresh Watcher observation.
+    /// Does not affect currentBucket — the caller decides whether to repaint.
+    func updateLastUsed(path: String, to date: Date) {
+        guard entries[path] != nil else { return }
+        entries[path]?.lastUsed = date
     }
 
     func setFrozen(path: String, frozen: Bool) {
