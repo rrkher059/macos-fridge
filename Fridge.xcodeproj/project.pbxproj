@@ -1,0 +1,467 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DA9A33DF6511457E97B6337E /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544F35EE0560404F95039EA2 /* AppDelegate.swift */; };
+		96A2DBC60D354CB5A6647605 /* Ledger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52780208100E490D88FAE6D7 /* Ledger.swift */; };
+		640D3AAAC02443CC937AEC63 /* MoldPainter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C37C517E756411EB83965DF /* MoldPainter.swift */; };
+		3F681B04828049F9B6033653 /* Watcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC85F6E4B134EE2B2DF0323 /* Watcher.swift */; };
+		2BEB97232DAE4F33A77A4346 /* MenuBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54FCA63D4BF47C283DE59AC /* MenuBar.swift */; };
+		4CC0CAAABDE6432C95BB6320 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 69788C84C7E64F788CDB055D /* Assets.xcassets */; };
+		8E47C54CDEE74DD6ACFF02E9 /* LedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3600EECC2B455DA638111C /* LedgerTests.swift */; };
+		81B98611B8674F6586F7D981 /* MenuBarBucketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3FE4538F8444CC7BE5ECBB0 /* MenuBarBucketTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		779AEE1F448148DF8EAF3A16 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D5ECBE3E6020465CA6B6D2DD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 02EED019AEBD40309E540466;
+			remoteInfo = Fridge;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		3DFBE6B6107A4C3DACBA9990 /* Fridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA09D1D2FC3346AB9876035B /* FridgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FridgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA88DA10589D44649EC634D0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		69788C84C7E64F788CDB055D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		544F35EE0560404F95039EA2 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		52780208100E490D88FAE6D7 /* Ledger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ledger.swift; sourceTree = "<group>"; };
+		8C37C517E756411EB83965DF /* MoldPainter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoldPainter.swift; sourceTree = "<group>"; };
+		7AC85F6E4B134EE2B2DF0323 /* Watcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Watcher.swift; sourceTree = "<group>"; };
+		C54FCA63D4BF47C283DE59AC /* MenuBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBar.swift; sourceTree = "<group>"; };
+		EE3600EECC2B455DA638111C /* LedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerTests.swift; sourceTree = "<group>"; };
+		B3FE4538F8444CC7BE5ECBB0 /* MenuBarBucketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarBucketTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		70FB86536D3E4DD1B1462DD7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		67BC21AEF5174D5A915F3AC6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		64A40BAC40424EC2877C3E4A = {
+			isa = PBXGroup;
+			children = (
+				AD2D4F88A1E34AAE958FCC3E /* Sources */,
+				B3DC5878616148ACAD58091B /* Tests */,
+				69788C84C7E64F788CDB055D /* Assets.xcassets */,
+				EA88DA10589D44649EC634D0 /* Info.plist */,
+				A4A53E446009412E8332EEFF /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A4A53E446009412E8332EEFF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3DFBE6B6107A4C3DACBA9990 /* Fridge.app */,
+				BA09D1D2FC3346AB9876035B /* FridgeTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AD2D4F88A1E34AAE958FCC3E /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				544F35EE0560404F95039EA2 /* AppDelegate.swift */,
+				52780208100E490D88FAE6D7 /* Ledger.swift */,
+				8C37C517E756411EB83965DF /* MoldPainter.swift */,
+				7AC85F6E4B134EE2B2DF0323 /* Watcher.swift */,
+				C54FCA63D4BF47C283DE59AC /* MenuBar.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		B3DC5878616148ACAD58091B /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				EE3600EECC2B455DA638111C /* LedgerTests.swift */,
+				B3FE4538F8444CC7BE5ECBB0 /* MenuBarBucketTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		02EED019AEBD40309E540466 /* Fridge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D3116F1E83EB4509A171D41B /* Build configuration list for PBXNativeTarget "Fridge" */;
+			buildPhases = (
+				9CC5C411CEF5408DAB8F5CCA /* Sources */,
+				70FB86536D3E4DD1B1462DD7 /* Frameworks */,
+				DF93FE0BB0BC4259B07A65C1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Fridge;
+			productName = Fridge;
+			productReference = 3DFBE6B6107A4C3DACBA9990 /* Fridge.app */;
+			productType = "com.apple.product-type.application";
+		};
+		688EF1145E88478ABF2AA875 /* FridgeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C25C60B37AC84E6893CB926A /* Build configuration list for PBXNativeTarget "FridgeTests" */;
+			buildPhases = (
+				185E0B3CAA434399BFFA47AA /* Sources */,
+				67BC21AEF5174D5A915F3AC6 /* Frameworks */,
+				1C61100660AF41048F787C0E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				21C63140E6B24562B8BC15FA /* PBXTargetDependency */,
+			);
+			name = FridgeTests;
+			productName = FridgeTests;
+			productReference = BA09D1D2FC3346AB9876035B /* FridgeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D5ECBE3E6020465CA6B6D2DD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					02EED019AEBD40309E540466 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					688EF1145E88478ABF2AA875 = {
+						CreatedOnToolsVersion = 16.2;
+						TestTargetID = 02EED019AEBD40309E540466;
+					};
+				};
+			};
+			buildConfigurationList = 7611B94230974B4DA79E2407 /* Build configuration list for PBXProject "Fridge" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 64A40BAC40424EC2877C3E4A;
+			productRefGroup = A4A53E446009412E8332EEFF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				02EED019AEBD40309E540466 /* Fridge */,
+				688EF1145E88478ABF2AA875 /* FridgeTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DF93FE0BB0BC4259B07A65C1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4CC0CAAABDE6432C95BB6320 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1C61100660AF41048F787C0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9CC5C411CEF5408DAB8F5CCA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA9A33DF6511457E97B6337E /* AppDelegate.swift in Sources */,
+				96A2DBC60D354CB5A6647605 /* Ledger.swift in Sources */,
+				640D3AAAC02443CC937AEC63 /* MoldPainter.swift in Sources */,
+				3F681B04828049F9B6033653 /* Watcher.swift in Sources */,
+				2BEB97232DAE4F33A77A4346 /* MenuBar.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		185E0B3CAA434399BFFA47AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8E47C54CDEE74DD6ACFF02E9 /* LedgerTests.swift in Sources */,
+				81B98611B8674F6586F7D981 /* MenuBarBucketTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		21C63140E6B24562B8BC15FA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 02EED019AEBD40309E540466 /* Fridge */;
+			targetProxy = 779AEE1F448148DF8EAF3A16 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6512E9E302F546088567EA2A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		2689DA0EB83A4E90ACF3625E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		88F9E731DF574D678A846A1D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fridge.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F1F98ED1488A45BDAD141003 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fridge.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1C96D22CBF254AC896D9BBD1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fridge.app.FridgeTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fridge.app/Contents/MacOS/Fridge";
+			};
+			name = Debug;
+		};
+		790AE83F36CE458092DFBA52 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "-";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fridge.app.FridgeTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fridge.app/Contents/MacOS/Fridge";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7611B94230974B4DA79E2407 /* Build configuration list for PBXProject "Fridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6512E9E302F546088567EA2A /* Debug */,
+				2689DA0EB83A4E90ACF3625E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D3116F1E83EB4509A171D41B /* Build configuration list for PBXNativeTarget "Fridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				88F9E731DF574D678A846A1D /* Debug */,
+				F1F98ED1488A45BDAD141003 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C25C60B37AC84E6893CB926A /* Build configuration list for PBXNativeTarget "FridgeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C96D22CBF254AC896D9BBD1 /* Debug */,
+				790AE83F36CE458092DFBA52 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D5ECBE3E6020465CA6B6D2DD /* Project object */;
+}
