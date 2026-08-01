@@ -63,10 +63,19 @@ final class Watcher {
     /// main thread, since its only listener (MenuBarController.runLoop)
     /// touches AppKit UI.
     func refresh() {
+        // Snapshot scopes on the caller's thread (always main — start(),
+        // the hourly timer, and the "Add Downloads and Desktop" flow are
+        // all main-thread) before handing off to the background queue.
+        // `scopes` is a plain var with no synchronization; reading it from
+        // inside the background closure instead would race against
+        // confirmEnableRealFolders() reassigning it from the main thread
+        // while a scan (which can take close to an hour against a real
+        // Downloads folder) is still in flight.
+        let scopesSnapshot = scopes
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             var files: [WatchedFile] = []
-            for scope in self.scopes {
+            for scope in scopesSnapshot {
                 files.append(contentsOf: self.scan(scope))
             }
             log.debug("Watcher: delivering \(files.count, privacy: .public) files")

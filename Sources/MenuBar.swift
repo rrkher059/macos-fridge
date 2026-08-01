@@ -95,7 +95,16 @@ final class MenuBarController: NSObject {
                     log.error("runLoop: could not snapshot clean icon for \(file.path, privacy: .public), skipping")
                     continue
                 }
-                ledger.register(path: file.path, cleanIconPNG: cleanPNG, lastUsed: file.lastUsed)
+                guard ledger.register(path: file.path, cleanIconPNG: cleanPNG, lastUsed: file.lastUsed) else {
+                    // Couldn't write the clean-icon file (disk full,
+                    // permissions, etc). Do NOT treat this file as known —
+                    // leaving no entry means we'll retry registering it next
+                    // pass, instead of silently locking it out of painting
+                    // forever with an entry that points at a file that
+                    // doesn't exist.
+                    log.error("runLoop: could not write clean icon file for \(file.path, privacy: .public), will retry next pass")
+                    continue
+                }
                 // Save the "we know about this file, haven't painted it"
                 // record BEFORE any paint happens below. If we crash between
                 // here and the paint, the worst case is a file the Ledger

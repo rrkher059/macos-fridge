@@ -131,11 +131,21 @@ final class Ledger {
     }
 
     /// First sighting. Snapshots the clean icon to its own file. Does
-    /// nothing if already known.
-    func register(path: String, cleanIconPNG: Data, lastUsed: Date) {
-        guard entries[path] == nil else { return }
+    /// nothing if already known. Returns false if the icon file couldn't be
+    /// written — in that case no entry is created, rather than creating one
+    /// that points at a file that doesn't exist, which would silently and
+    /// permanently block this path from ever being painted (cleanIconData
+    /// would return nil forever, with no way to recover short of forgetting
+    /// and re-registering the path).
+    @discardableResult
+    func register(path: String, cleanIconPNG: Data, lastUsed: Date) -> Bool {
+        guard entries[path] == nil else { return true }
         let filename = Self.iconFilename(forPath: path)
-        try? cleanIconPNG.write(to: Self.iconsDirectory.appendingPathComponent(filename), options: .atomic)
+        do {
+            try cleanIconPNG.write(to: Self.iconsDirectory.appendingPathComponent(filename), options: .atomic)
+        } catch {
+            return false
+        }
         entries[path] = LedgerEntry(
             cleanIconFilename: filename,
             lastUsed: lastUsed,
@@ -143,6 +153,7 @@ final class Ledger {
             frozen: false,
             firstSeen: Date()
         )
+        return true
     }
 
     func updateBucket(path: String, to bucket: Bucket) {
