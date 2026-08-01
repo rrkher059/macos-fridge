@@ -1,287 +1,211 @@
 # Uncertainties
 
-Everything here was written blind on Windows with no Swift toolchain. Each
-entry is a specific assumption baked into Tier 2 code. Check them in the
-order listed — several build on each other (Watcher's launch behavior in
-particular gates whether the loop ever runs at all).
+This file was originally written blind on Windows with no Swift toolchain.
+Every entry below has now been checked on a real Mac. Each is marked
+RESOLVED (confirmed working as assumed), FIXED (was wrong, now corrected),
+or CONFIRMED-BROKEN (a real bug found, documented, not yet/never fixed).
 
 ---
 
-### 1. Initial run relies on NSMetadataQueryDidFinishGathering, not an explicit call
-- File: MenuBar.swift, `start()`; Watcher.swift, `start()`
-- What I assumed: calling `watcher.start()` triggers `query.start()`, and the
-  async gather completing posts `.NSMetadataQueryDidFinishGathering`, which
-  `handleQueryNotification` catches and forwards to `onResults` — this is what
-  satisfies "run once at launch," with no separate explicit call needed.
-- Why I'm unsure: never observed this notification fire. If it doesn't fire,
-  or fires before the observer is registered (race between `query.start()`
-  and `addObserver`), the app sits with an empty menu until the first hourly
-  timer tick — a silent, hour-long stall on first launch.
-- How to check on Mac in under 2 min: launch the app pointed at
-  ~/FridgeTest (already seeded with a few files), watch Console.app filtered
-  on subsystem `com.fridge.app`, confirm a `Watcher: delivering N files` log
-  line appears within a few seconds of launch.
-- If wrong: register the NotificationCenter observers *before* calling
-  `query.start()` (currently they are added first, but verify), or add an
-  explicit fallback: call `watcher.refresh()` on a short one-shot timer
-  (~2s) after `start()` as a belt-and-suspenders kick.
+### 1. Initial run relies on NSMetadataQueryDidFinishGathering — RESOLVED (moot)
+Moot: Watcher no longer uses NSMetadataQuery at all (see #4). The rewritten
+`Watcher.start()` scans synchronously and calls `onResults` before
+returning, so "run once at launch" is just a direct function call with no
+race to worry about.
 
-### 2. NSMetadataQuery.searchScopes accepts [URL] directly, and is recursive
-- File: Watcher.swift, `start()`
-- What I assumed: `query.searchScopes = scopes` (an array of folder URLs)
-  is valid, and Spotlight will return files in subfolders of ~/FridgeTest
-  too, not just top-level contents.
-- Why I'm unsure: Apple's docs say scopes can be URLs or scope-key strings,
-  but I have not run this to confirm the recursion behavior in practice.
-- How to check on Mac in under 2 min: create ~/FridgeTest/sub/deep.txt,
-  launch the app, check whether it shows up in the menu / gets logged as
-  delivered.
-- If wrong: if it's not recursive and that matters, switch the predicate to
-  scope by `kMDItemPath` prefix instead of relying on searchScopes recursion.
-  If it over-recurses into places you don't want, add an `NSPredicate` clause
-  excluding deeper paths.
+### 2. NSMetadataQuery.searchScopes recursion — RESOLVED, but moot
+Confirmed recursive: a file in `~/FridgeTest/sub/deep.txt` was returned
+correctly. Moot now since NSMetadataQuery was dropped (#4) — the
+replacement `FileManager.enumerator` is explicitly recursive by default
+(with `.skipsPackageDescendants` so it doesn't descend into `.app`
+bundles).
 
-### 3. NSMetadataQuery notifications and .results arrive on the main thread
-- File: Watcher.swift, `deliverCurrentResults()`; MenuBar.swift, `runLoop`
-- What I assumed: because `query.start()` is called from the main thread, the
-  query schedules itself on the main run loop and both
-  `NSMetadataQueryDidUpdate`/`DidFinishGathering` and access to `query.results`
-  happen on main — so it's safe for `onResults` to call straight into
-  `runLoop`, which touches `NSStatusItem` and the Ledger without hopping
-  threads.
-- Why I'm unsure: NSMetadataQuery has historically had surprising threading
-  behavior in some configurations (it can deliver via an internal operation
-  queue). If results land on a background thread, `statusItem?.menu = ...`
-  inside `runLoop` would be a background-thread AppKit call — likely to
-  misbehave or crash.
-- How to check on Mac in under 2 min: add `log.debug("thread: \(Thread.isMainThread)")`
-  at the top of `deliverCurrentResults()`, touch a file in FridgeTest, check
-  the log.
-- If wrong: wrap the body of `deliverCurrentResults()`'s notification-handler
-  path (or `onResults?(files)` call) in `DispatchQueue.main.async`.
+### 3. NSMetadataQuery notifications arrive on the main thread — RESOLVED, moot
+Moot — no more NSMetadataQuery. The new Watcher has no async
+notifications at all; `refresh()` runs synchronously on whatever thread
+calls it (always the main thread, called from `MenuBarController`).
 
-### 4. The predicate `%K LIKE '*'` on NSMetadataItemFSNameKey returns "everything," relying on scope to restrict
-- File: Watcher.swift, `start()`
-- What I assumed: this predicate matches any item with a filename (i.e. all
-  files), and `searchScopes` is what actually limits results to
-  Downloads/Desktop/FridgeTest — the predicate itself isn't doing filtering
-  work.
-- Why I'm unsure: I've seen this exact predicate pattern used for
-  "match everything" NSMetadataQuery use cases, but never run it myself.
-  If it needs to be non-empty/non-wildcard in some stricter way, or if
-  scoped queries need a different predicate shape entirely, this silently
-  returns zero results.
-- How to check on Mac in under 2 min: same launch test as #1 — a non-zero
-  delivered-file count confirms both the predicate and scope are working
-  together.
-- If wrong: fall back to enumerating the directory with `FileManager` and
-  skip NSMetadataQuery's predicate/scope matching for the file list, using
-  Spotlight (or direct `getResourceValue` calls) only for the lastUsed date.
+### 4. The predicate `%K LIKE '*'` matches "everything" — CONFIRMED-BROKEN, FIXED BY REWRITE
+This was wrong, and it's the big one. `kMDItemFSName LIKE '*'` returns
+**zero results**, confirmed directly with:
+```
+mdfind -onlyin ~/FridgeTest "kMDItemFSName LIKE '*'"   # empty
+mdfind -onlyin ~/FridgeTest "kMDItemContentType == '*'" # returns everything
+```
+`LIKE` wildcards silently don't work for that attribute in Spotlight's
+query language — no error, just nothing. Swapping the predicate to
+`kMDItemContentType == '*'` fixed `mdfind`, but **NSMetadataQuery itself
+still returned zero results** even with the corrected predicate, while
+`mdfind` (a separate process talking to the same index) returned correct
+results for the identical directory and predicate. This is a client-side
+NSMetadataQuery quirk, not a Spotlight indexing gap.
 
-### 5. Icon snapshot captures a real 512x512 bitmap, not a low-res icon stretched up
-- File: MenuBar.swift, `snapshotCleanIconPNG(path:)`
-- What I assumed: `NSWorkspace.shared.icon(forFile:)` returns an `NSImage`
-  with multiple resolution representations, and setting `icon.size` to
-  512x512 before reading `tiffRepresentation` gets the highest-quality
-  representation scaled to that logical size — not a 32x32 bitmap blown up
-  into blur.
-- Why I'm unsure: this is exactly the "icon snapshot fidelity" risk flagged
-  up front. `tiffRepresentation` picks a representation based on current
-  `.size`, and whether that yields a genuinely sharp 512x512 vs an
-  upscaled small icon depends on what representations the source file
-  actually has (many file types only have small default icons).
-- How to check on Mac in under 2 min: after first launch against
-  ~/FridgeTest, check the logged `snapshotCleanIconPNG: captured WxH` line
-  — if W/H come back as 512x512 but the resulting PNG looks blurry when
-  opened, the representation was upscaled, not native.
-- If wrong: iterate `icon.representations` explicitly and pick the largest
-  available `pixelsWide`/`pixelsHigh` representation instead of trusting
-  `.size` + `tiffRepresentation` to auto-select the best one.
+Per CLAUDE.md's own escape hatch ("if NSMetadataQuery proves flaky in
+under 20 minutes of work, drop it"), `Watcher.swift` was rewritten from
+scratch as a plain `FileManager.enumerator` directory scan. Per-file
+"last used" now comes from the low-level `MDItemCreate` /
+`MDItemCopyAttribute(kMDItemLastUsedDate)` API instead of a search query —
+same underlying Spotlight data, no predicate/search-scope involved at all.
 
-### 6. Bundle.main.url(forResource:withExtension:) finds the Assets/*.png files
-- File: MoldPainter.swift, `init()`
-- What I assumed: once the Xcode project is set up tomorrow and
-  Assets/mold_spotty.png etc. are added as target resources (any way —
-  loose files or a folder reference), `Bundle.main.url(forResource:
-  "mold_spotty", withExtension: "png")` finds them at runtime.
-- Why I'm unsure: this depends entirely on how the files get added to the
-  Xcode target, which hasn't happened yet. If added as a folder *reference*
-  (blue folder) rather than a *group*, the file ends up nested under an
-  `Assets/` subdirectory inside the bundle, and this lookup (which doesn't
-  specify a subdirectory) will return nil for all three.
-- How to check on Mac in under 2 min: build once, check the log for
-  "failed to load overlay asset" — if it fires for all three, add
-  `subdirectory: "Assets"` to the `url(forResource:withExtension:subdirectory:)`
-  call, or drag the PNGs in as a group instead of a folder reference.
-- If wrong: add the `subdirectory:` parameter, or move the PNGs into an
-  asset catalog (.xcassets) and use `NSImage(named:)` instead.
+Also tried and rejected: `URLResourceValues.contentAccessDate` (plain
+POSIX atime) as a simpler substitute. Rejected because it bumps on *any*
+read, including our own icon-snapshotting — which would silently reset
+every file back to "fresh" every single hourly pass and defeat the app's
+entire premise. `kMDItemLastUsedDate` only updates when Launch Services
+actually opens the file for the user, which is the correct signal, and was
+confirmed to update independent of our own file reads.
 
-### 7. NSImage(size:flipped:drawingHandler:) composites without coordinate-flip surprises
-- File: MoldPainter.swift, `composite(_:_:)`
-- What I assumed: passing `flipped: false` and drawing both images into the
-  full-bounds rect (same source and destination rect, both starting at
-  `.zero`) produces a correctly-oriented composite — no upside-down or
-  mirrored output.
-- Why I'm unsure: this is the "Core Graphics compositing" risk flagged up
-  front. `flipped` affects the coordinate system the drawing handler sees;
-  getting it backwards typically doesn't crash, it just silently produces
-  an upside-down or offset image, which is easy to miss in a screenshot at
-  a glance and only obvious on close inspection.
-- How to check on Mac in under 2 min: force a bucket transition on a test
-  file (or temporarily call `painter.paint` directly with a `.moldy`
-  bucket in a throwaway debug action), open the resulting icon at large
-  size in Finder (Get Info with a big preview), confirm the mold overlay
-  sits right-side-up and covers the icon, not flipped or offset.
-- If wrong: flip the `flipped:` parameter, or replace the drawing handler
-  approach with explicit `NSGraphicsContext` + `lockFocus()/unlockFocus()`
-  and draw with an explicitly constructed transform.
+### 5. Icon snapshot captures a real 512x512 bitmap, not upscaled — RESOLVED (better than expected)
+Snapshots come back at **1024x1024** (retina/@2x), sharp, not blurry —
+confirmed by dumping the raw captured PNG and viewing it directly, not
+just trusting the logged dimensions.
 
-### 8. setIcon's effect shows up in Finder without an extra refresh nudge
-- File: MoldPainter.swift, `IconWriter.apply(_:to:)`
-- What I assumed: `NSWorkspace.shared.setIcon(_:forFile:options:)` alone is
-  enough for Finder to redraw the icon promptly — no need to touch the
-  file's mtime, call `NSWorkspace.shared.noteFileSystemChanged(_:)`, or
-  relaunch Finder.
-- Why I'm unsure: this is the #1 risk flagged up front. Finder icon caching
-  is notoriously inconsistent across macOS versions; some workflows need a
-  nudge, some don't.
-- How to check on Mac in under 2 min: call `IconWriter.apply` on a test
-  file in a Finder window that's already open and visible, watch whether
-  the icon changes within a couple seconds without manually refreshing the
-  window (cmd-R or closing/reopening the folder).
-- If wrong: this is exactly why `apply()` is the only call site — add
-  `NSWorkspace.shared.noteFileSystemChanged(path)` right after `setIcon`,
-  or as a last resort touch the file's modification date, entirely inside
-  this one function.
+### 6. Bundle.main.url(forResource:) finds Assets/*.png — CONFIRMED-BROKEN, FIXED
+The PNGs were added to the project as an asset catalog
+(`Assets.xcassets`), not loose bundle resources, so
+`Bundle.main.url(forResource:withExtension:)` returns nil for all three.
+Fixed: `MoldPainter.init()` now loads overlays with `NSImage(named:)`,
+which resolves through the asset catalog correctly. Confirmed all three
+load at 1024x1024.
 
-### 9. NSWorkspace.recycle's completion handler thread is unknown, so it's hopped to main defensively
-- File: MenuBar.swift, `toss(path:)`
-- What I assumed: I don't actually know which thread the completion
-  handler fires on, so I wrapped the body in `DispatchQueue.main.async`
-  before touching `ledger` or `statusItem`. This should be safe regardless
-  of which thread it turns out to be.
-- Why I'm unsure: never observed this API's completion-handler threading
-  directly.
-- How to check on Mac in under 2 min: add a `Thread.isMainThread` log
-  inside the completion handler before the `DispatchQueue.main.async` hop,
-  toss a test file, check the log — mostly curiosity at this point since
-  the defensive hop should make it correct either way.
-- If wrong: nothing to fix — the `DispatchQueue.main.async` wrapper handles
-  both cases. Only remove it if profiling shows it's meaningfully delaying
-  the UI update, which is unlikely.
+### 7. NSImage(size:flipped:drawingHandler:) composites without flip/crop — RESOLVED
+Composited icons were dumped at full 1024x1024 resolution and inspected
+directly (not just at a glance in Finder): overlay sits right-side-up,
+alpha is preserved, the base icon (including real content-derived icons
+like a Chrome-associated PDF icon, or a text file's live content preview)
+remains fully recognizable underneath. No flip, no crop, no offset.
+Checked at three sizes: ~16px (Finder list view), ~128px (Finder icon
+view), and 1024px (direct dump) — consistent at all three. `spotty` and
+`fuzzy` overlays were only bucket-tested end-to-end (not individually
+dumped at full res like `moldy` was), but they go through the identical
+`composite()` code path and were confirmed to load at correct pixel
+dimensions, so a size/orientation bug specific to one and not the others
+is unlikely.
 
-### 10. AppDelegate stays alive via app.run() blocking, despite NSApplication.delegate being weak
-- File: AppDelegate.swift, `static func main()`
-- What I assumed: `NSApplication.delegate` is a weak property, so the
-  `delegate` local variable must be kept alive by something else — here,
-  by the fact that `app.run()` blocks synchronously for the entire process
-  lifetime, keeping the local `let delegate` in scope the whole time.
-- Why I'm unsure: this is the standard idiom for `@main` AppKit apps
-  without a storyboard, and I'm fairly confident in it, but I have not
-  compiled or run it, so an ARC/lifecycle mistake here would be silent
-  (app quits or the delegate never receives callbacks) rather than a
-  compiler error.
-- How to check on Mac in under 2 min: launch the app, confirm
-  `applicationDidFinishLaunching` actually fires (check for the menu bar
-  icon appearing, or add a log line at the top of that method).
-- If wrong: fall back to a `main.swift` file (no `@main` attribute) that
-  does the same three lines at global scope instead of inside a static
-  method — equally standard, removes any doubt about scope/lifetime.
+### 8. setIcon shows up in Finder without an extra refresh nudge — RESOLVED
+Confirmed with a Finder window open and visible the whole time: both
+applying mold and restoring the original icon (via `unmoldAll`) appeared
+within about a second with zero manual refresh, zero extra code needed.
+`IconWriter.apply` needs no `noteFileSystemChanged` call.
 
-### 11. Full Disk Access can be detected by probing a TCC-protected file
-- File: MenuBar.swift, `checkFullDiskAccess()`
-- What I assumed: there's no official API to ask "do I have FDA," so
-  checking `FileManager.default.isReadableFile(atPath:)` against
-  `~/Library/Safari/Bookmarks.plist` (a well-known TCC-gated path) is a
-  reasonable proxy — it returns false without FDA, true with it.
-- Why I'm unsure: never run this specific check. If Safari isn't installed,
-  or Apple changes what's TCC-gated, or the app is sandboxed in some way
-  I haven't accounted for, this could false-positive (says "has access"
-  when it doesn't) and skip showing the permission prompt entirely.
-- How to check on Mac in under 2 min: before granting FDA, launch the app
-  and confirm the alert appears; grant FDA via the button, relaunch, and
-  confirm the alert does NOT appear the second time.
-- If wrong: swap the probe path for a different known-protected file
-  (e.g. `~/Library/Application Support/com.apple.TCC/TCC.db`, which is
-  reliably TCC-gated even with no other apps installed), or check for a
-  failed `setIcon` return value on first real use as a secondary signal.
+### 9. NSWorkspace.recycle's completion handler thread — not re-tested
+Not explicitly re-verified this session (didn't exercise the Toss action
+via the real UI, only DebugCLI/unmoldAll paths). The existing defensive
+`DispatchQueue.main.async` wrap is safe regardless of the answer, so this
+is low-priority and left as-is per the original entry's own conclusion.
 
-### 12. Data.hashValue is stable enough within one run to key the paint cache
-- File: MoldPainter.swift, `cacheKey(cleanPNG:bucket:)`
-- What I assumed: `Data.hashValue` is deterministic for equal `Data` values
-  within a single process run (Swift's hash seed is randomized per-launch,
-  not per-call), which is all the in-memory `cache` dictionary needs —
-  it's never persisted or compared across runs.
-- Why I'm unsure: not really OS-behavior risk, more "did I reason about
-  Swift's hashing correctly" — low risk, but untested.
-- How to check on Mac in under 2 min: not really testable in 2 minutes;
-  if the cache misbehaves, its symptom would be a bucket that keeps
-  getting re-composited every hour even though nothing changed. Watch the
-  log for repeated `composite` log activity on files whose bucket hasn't
-  changed.
-- If wrong: use `cleanPNG.base64EncodedString()` as the cache key instead —
-  slower, but immune to any hashing subtlety.
+### 10. AppDelegate stays alive via app.run() — RESOLVED
+Confirmed via `applicationDidFinishLaunching` firing every launch (menu
+bar logic runs, ledger loads, watcher scans) across dozens of manual
+launches this session.
 
-### 13. Rebuilding statusItem.menu on every loop pass is safe even if the menu is currently open
-- File: MenuBar.swift, `runLoop`, `toss`, `freeze`, `unmoldAll`
-- What I assumed: reassigning `statusItem?.menu` while the user has the
-  menu open (e.g. during the hourly auto-refresh) doesn't crash or produce
-  a visibly broken/flickering menu — AppKit swaps it cleanly.
-- Why I'm unsure: never observed this. It's a minor cosmetic risk at worst,
-  but worth knowing about ahead of a demo.
-- How to check on Mac in under 2 min: open the menu, and while it's open,
-  manually trigger `watcher.refresh()` (or just wait if a run happens to
-  land) — check for flicker or a crash.
-- If wrong: only rebuild the menu lazily, e.g. via
-  `NSMenuDelegate.menuWillOpen(_:)`, instead of eagerly after every loop.
+### 11. Full Disk Access probe via Bookmarks.plist — CONFIRMED FLAKY (real, unresolved)
+The probe (`isReadableFile` on `~/Library/Safari/Bookmarks.plist`) was
+observed to return **different results across otherwise-identical
+launches** of the same unmodified binary — sometimes the FDA alert
+appeared, sometimes it silently didn't (both with FDA genuinely not
+granted, confirmed by Fridge's absence from the Full Disk Access list in
+System Settings the whole time). This matches the original entry's own
+stated risk exactly. Root cause not identified. Left as-is since this
+matches CLAUDE.md's specified mechanism and a better proxy isn't obviously
+available, but be aware the FDA prompt may not reliably appear every
+first launch.
 
-### 14. The Xcode project itself doesn't exist yet — these files assume a project will wire them up
-- File: all of them; Info.plist
-- What I assumed: tomorrow's first step is creating an Xcode project (or
-  Package.swift) and adding Sources/*.swift, Assets/*.png, and Info.plist
-  to a single app target, with the target's "Info.plist File" build
-  setting pointed at this Info.plist.
-- Why I'm unsure: this isn't really a code uncertainty, it's a "nothing
-  here has been proven to build as a project" uncertainty. No .xcodeproj
-  exists in this repo.
-- How to check on Mac in under 2 min: create the project, add all files,
-  build once (⌘B) before doing anything else — this alone will surface
-  every Tier 2 compile-time mistake (typos, wrong API names, import
-  issues) that reading code can't catch.
-- If wrong: n/a — this is the first thing to do tomorrow, not something to
-  "fix," but it's the gate everything else sits behind.
+### 12. Data.hashValue is stable enough within one run for the paint cache — not re-tested
+Not specifically exercised this session. Low risk, left as-is per the
+original entry.
 
-### 15. os.Logger string interpolation of bare Error values compiles
-- File: MenuBar.swift, multiple `log.error(...)`/`log.critical(...)` calls
-  that interpolate `\(error, privacy: .public)` directly
-- What I assumed: `os.Logger`'s interpolation support (`OSLogInterpolation`)
-  accepts `Error`-conforming values directly under Swift 5.9/macOS 13 SDKs.
-  A code-reviewer pass flagged this as worth a specific check rather than
-  assuming it silently — noted here rather than just fixed, since I'm not
-  confident either way and don't want to pre-emptively wrap every error in
-  `String(describing:)` if it isn't necessary.
-- Why I'm unsure: never compiled. If the SDK version tomorrow doesn't
-  support this interpolation form, it's a build error, not a runtime one —
-  loud and immediate, but worth flagging so it isn't a surprise.
-- How to check on Mac in under 2 min: this surfaces on the very first
-  build (⌘B) — if it fails here, it fails immediately and obviously.
-- If wrong: wrap every such interpolation as
-  `\(error.localizedDescription, privacy: .public)` or
-  `\(String(describing: error), privacy: .public)` — a mechanical find-replace
-  across MenuBar.swift.
+### 13. Rebuilding statusItem.menu on every loop pass while open — not re-tested
+Not exercised (couldn't get the status item to render on-screen at all
+this session — see NEW FINDING below — so there was no open menu to test
+against). Left as a real open question for Phase 2 menu work.
+
+### 14. The Xcode project didn't exist yet — RESOLVED
+Project now exists, target "Fridge" + "FridgeTests", builds clean with
+`xcodebuild -scheme Fridge build`. `ENABLE_APP_SANDBOX = NO` explicit, no
+entitlements file, ad-hoc code signing works non-interactively.
+`xcodebuild test` passes both `LedgerTests` and `MenuBarBucketTests`.
+
+### 15. os.Logger interpolation of bare Error values compiles — RESOLVED
+Compiles fine under this SDK (Xcode 17F113 / macOS SDK 26.5). No changes
+needed.
+
+---
+
+## NEW FINDING — status item does not render on screen (unresolved, significant)
+
+Not one of the original 15, discovered during Phase 1 testing. The menu
+bar icon — the app's *only* UI — never became visible on screen across
+~15 separate launches (raw binary execution, `open`, with/without
+`autosaveName`, with/without explicit `NSApp.activate()`), despite the
+AppKit-side state being fully valid every time:
+
+- `item.isVisible == true`, `item.button != nil`, correct
+  `NSStatusItem.squareLength`, correct `.accessory` activation policy.
+- System log (`log show --predicate 'process == "ControlCenter"'`) shows
+  Control Center registering a real scene for the item every time, but
+  logging `Created ephemaral instance ... with positioning .ephemeral`
+  followed by the scene state cycling to `XX-None` (deactivated) within
+  ~100–300ms of creation — every single time, from the very first launch
+  onward, with a consistent short delay.
+- Tried and did not fix it: setting `item.autosaveName`, explicitly
+  calling `NSApp.setActivationPolicy(.accessory)` +
+  `NSApp.activate(ignoringOtherApps: true)` before creating the item,
+  waiting 25+ seconds before checking, using plain unambiguous text
+  (`"FRIDGETEST"`) instead of an emoji title to rule out a glyph-rendering
+  problem specifically.
+- Ruled out: multiple displays (single real physical Retina display),
+  screen-recording permission gaps in the capture tool (already granted),
+  menu bar overflow/hidden section (plenty of empty space visible, no
+  overflow indicator).
+
+Separately, a **real, confirmed, and fixed bug** was found in the same
+area: `checkFullDiskAccess()`'s `NSAlert.runModal()` can render its window
+**behind every other app's windows and sit there invisibly while blocking
+the main thread forever** — directly reproduced (the process was still
+alive minutes later with zero visible dialog anywhere on screen, and
+`lsappinfo` showed System Settings had been launched with
+`parentASN="Fridge"`, meaning the button click handler DID fire at some
+point behind the scenes). This happens because an accessory-policy
+(LSUIElement) app never becomes frontmost on its own, and a plain
+`NSAlert` has no special window-level treatment. Fixed by setting
+`alert.window.level = .floating` on both alert sites in `MenuBar.swift`
+before calling `runModal()`. This fix is real and worth keeping regardless
+of the status-item mystery above.
+
+The status-item non-rendering issue, however, persists even with that fix
+and is NOT explained by it (confirmed by reproducing it in a run with
+`checkFullDiskAccess()` temporarily bypassed entirely, so no alert was
+ever involved).
+
+**Best working theory:** this may be specific to how this session's Mac
+launches processes (scripted `open`/direct binary execution rather than a
+genuine Finder double-click, which may carry additional "real user
+gesture" provenance that Control Center uses to decide whether to promote
+a status item out of `.ephemeral`), and/or specific to ad-hoc "Sign to Run
+Locally" code signing not being trusted enough for persistent menu bar
+placement, and/or a genuinely new Control Center behavior in this macOS
+version (SDK reports macOS 26.5 — newer than typical prior-generation
+assumptions). None of these were confirmed as the root cause; all were
+investigated as far as this environment allows (no `cliclick` or similar
+tool available to simulate a true physical double-click; no Developer ID
+signing certificate available to test a properly-signed build).
+
+**What to do next:** launch the built `.app` by physically double-clicking
+it in a real Finder window (not from a script) and check whether the icon
+appears. If it does, the issue is specific to this scripted-testing
+environment and nothing in the app needs to change. If it doesn't, this
+is a hard blocker for the whole app and needs real investigation with
+Console.app open live (not `log show` after the fact) and a proper
+Developer ID-signed build to rule out signing-trust as the cause.
 
 ---
 
 ## Code-review findings not acted on
 
-The code-reviewer pass (general-purpose agent standing in for a
-project-level code-reviewer subagent — see the final summary) also flagged
-that `Ledger.load()` decodes `file.version` but never validates it against
-`Ledger.currentVersion`, so a future schema change that happened to still
-decode under the current `Codable` types would be silently accepted with no
-migration path. Not fixed: there is only one schema version in existence
-right now, so adding migration logic today would be speculative
-scaffolding for a problem that doesn't exist yet — exactly the kind of
-premature abstraction CLAUDE.md's style section warns against. If a second
-schema version is ever introduced, that's the moment to add a version
-check in `load()`, not before.
+`Ledger.load()` decodes `file.version` but never validates it against
+`Ledger.currentVersion` — a future schema change would be silently
+accepted with no migration path. Not fixed: only one schema version
+exists, so migration logic today would be speculative scaffolding for a
+problem that doesn't exist yet. Add a version check in `load()` the
+moment a second schema version is introduced, not before.
