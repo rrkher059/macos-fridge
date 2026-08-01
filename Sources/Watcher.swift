@@ -1,4 +1,9 @@
 import Foundation
+import os
+
+// TIER 2 — UNVERIFIED. Never compiled, never run. Depends on runtime
+// behavior that was not observable when written. Rewrite freely.
+// Do NOT patch symptom-by-symptom.
 
 /// Asks Spotlight what is in Downloads and Desktop, and when each file
 /// was last opened.
@@ -14,28 +19,61 @@ struct WatchedFile {
 
 final class Watcher {
 
-    /// While building, point this at ~/FridgeTest.
-    /// Do NOT point it at real Downloads until the painter is confirmed.
-    var scopes: [URL] = []
+    // TODO: switch to real Downloads + Desktop once the painter has been
+    // confirmed safe against ~/FridgeTest. See CLAUDE.md safety rules.
+    var scopes: [URL] = [
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("FridgeTest", isDirectory: true)
+    ]
 
     private let query = NSMetadataQuery()
+    private var isRunning = false
 
     /// Called whenever Spotlight has fresh results.
     var onResults: (([WatchedFile]) -> Void)?
 
     func start() {
-        // TODO: configure predicate + searchScopes, observe
-        // NSMetadataQueryDidFinishGathering and
-        // NSMetadataQueryDidUpdate, then query.start()
+        guard !isRunning else { return }
+        isRunning = true
+
+        query.searchScopes = scopes
+        query.predicate = NSPredicate(format: "%K LIKE '*'", NSMetadataItemFSNameKey)
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleQueryNotification),
+            name: .NSMetadataQueryDidFinishGathering, object: query
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleQueryNotification),
+            name: .NSMetadataQueryDidUpdate, object: query
+        )
+
+        query.start()
     }
 
     func stop() {
-        // TODO
+        guard isRunning else { return }
+        isRunning = false
+        query.stop()
+        NotificationCenter.default.removeObserver(self)
     }
 
-    /// Force a fresh read right now. Used by the hourly timer.
+    /// Force a fresh read right now. Used by the hourly timer. Assumes the
+    /// query is already running and gathered — see UNCERTAINTIES.md.
     func refresh() {
-        // TODO
+        deliverCurrentResults()
+    }
+
+    @objc private func handleQueryNotification(_ notification: Notification) {
+        deliverCurrentResults()
+    }
+
+    private func deliverCurrentResults() {
+        query.disableUpdates()
+        let files = query.results.compactMap { $0 as? NSMetadataItem }.compactMap(parse)
+        query.enableUpdates()
+
+        log.debug("Watcher: delivering \(files.count, privacy: .public) files")
+        onResults?(files)
     }
 
     // MARK: - Parsing
@@ -45,7 +83,21 @@ final class Watcher {
     /// Fall back to kMDItemFSCreationDate when kMDItemLastUsedDate is nil.
     /// Return nil for folders, bundles, and anything hidden.
     private func parse(_ item: NSMetadataItem) -> WatchedFile? {
-        // TODO
-        return nil
+        guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String else {
+            return nil
+        }
+
+        let name = (path as NSString).lastPathComponent
+        guard !name.hasPrefix(".") else { return nil }
+
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return nil }
+        guard !isDir.boolValue else { return nil } // folders and bundles are both directories
+
+        let lastUsed = (item.value(forAttribute: NSMetadataItemLastUsedDateKey) as? Date)
+            ?? (item.value(forAttribute: NSMetadataItemFSCreationDateKey) as? Date)
+            ?? Date()
+
+        return WatchedFile(path: path, lastUsed: lastUsed, isDirectory: false)
     }
 }
