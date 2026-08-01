@@ -97,3 +97,54 @@ close button and then the Dock icon, watching Activity Monitor briefly
 afterward, before fully trusting it — rather than re-attempting automated
 Apple Event-driven testing of window close, which is what triggered the
 spike here.
+
+## Watcher reverted back to ~/FridgeTest — real Downloads is not safe yet (2026-08-01)
+
+Pointed the Watcher at real Downloads + Desktop, with the user's
+explicit go-ahead, and actually launched the app against them. Reverted
+immediately after discovering two real problems, neither hypothetical:
+
+**1. Scale.** The real Downloads folder alone has 5,106 files. At roughly
+0.7–1 second per file (a Spotlight metadata lookup plus a full-resolution
+icon snapshot, per file, on first sight), a first run is a ~1-hour,
+continuously-CPU-busy operation. Nothing in the current design tells the
+user this is happening, how long it will take, or lets them see progress
+— it just silently starts repainting the icons of every file older than
+14 days, all at once, with no preview or confirmation step.
+
+**2. Data loss risk under interruption — reproduced, not theoretical.**
+The process was killed partway through (to stop the hour-long scan once
+its scale became clear). `IconWriter.apply` (the actual `setIcon` disk
+write) runs inline per-file inside the loop, but `ledger.save()` only
+happens once, after the *entire* pass finishes. Killing the process
+mid-pass left **53 real files with a custom icon already written to
+disk, with zero corresponding Ledger entry** — confirmed directly via
+`GetFileInfo`'s custom-icon attribute flag. Since "Unmold All" only
+iterates `ledger.allPaths`, it would never have known these files needed
+restoring. All 53 were found and fixed by hand
+(`NSWorkspace.setIcon(nil,...)` on each, verified clean afterward) —
+recoverable this time only because the affected paths were still sitting
+in the log output.
+
+An initial fix (call `ledger.save()` after every file, not just once at
+the end) was tried and reverted — it makes the actual problem worse, not
+better. The Ledger stores each file's clean icon as a full base64-encoded
+PNG **inline in the same JSON file** (per CLAUDE.md's specified format);
+at ~231KB average per entry, extrapolated to 5,106 files that's roughly
+**1.1GB** for the ledger alone. Saving after every single file during a
+scan of that size means rewriting an ever-growing file, up to ~1.1GB
+each time, thousands of times in a row — turning an already-slow ~1-hour
+scan into something dramatically worse, potentially many hours or an
+effective hang, and writing terabytes of cumulative disk I/O in the
+process.
+
+**Status: reverted, not fixed.** `Watcher.scopes` points at `~/FridgeTest`
+again. The real fix is architectural — most likely storing each file's
+clean-icon snapshot as its own file on disk (keyed by path hash or
+similar) rather than inline in one giant growing JSON, plus some form of
+incremental or batched progress so an interrupted first run can resume
+without redoing work or losing track of what's already been painted.
+That's a real design decision (it changes the Ledger JSON shape CLAUDE.md
+specifies), not something to sneak in unilaterally — flagging it here for
+that decision to be made deliberately, rather than the scope being
+switched back to Downloads/Desktop again without it.

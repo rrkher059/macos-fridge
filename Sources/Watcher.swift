@@ -37,9 +37,13 @@ struct WatchedFile {
 
 final class Watcher {
 
+    // Reverted to FridgeTest after a real run against Downloads found 5,106
+    // files — a roughly hour-long first scan that mass-repaints every file
+    // older than 14 days with no incremental checkpointing. Re-enable only
+    // after runLoop saves progress per-file (see MenuBar.swift) has been
+    // verified safe against a folder that size. See DECISIONS.md.
     var scopes: [URL] = [
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true),
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true),
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("FridgeTest", isDirectory: true)
     ]
 
     /// Called whenever a scan produces a fresh file list.
