@@ -1,65 +1,39 @@
 # Fridge
 
-A macOS app for Downloads and Desktop. Files you don't touch grow mold on
-their icons — right on the icon, in Finder, not a notification. The longer
-a file sits untouched, the worse it looks, in four stages from fresh to
-fuzzy. You clean up because it's gross, not because something nagged you.
+Files you ignore in Downloads and Desktop grow mold on their icons, right in Finder, until you deal with them.
 
-Open the window to see every tracked file grouped into shelves — fresh on
-top, rotting toward the bottom — with each file's real current icon, how
-long since it was last opened, and buttons to reveal it in Finder, freeze
-it so it never rots, or toss it to the Trash.
+![Fridge window showing files grouped by freshness, with real moldy icons](docs/window.png)
 
-![Fridge window showing files grouped by freshness, with real moldy icons](Screenshots/window.png)
+![Finder window showing fresh, moldy, and fuzzy icons side by side](docs/finder.png)
 
-The mold is a real custom icon, written straight to the file — this is the
-same folder in Finder, not a mockup:
+**How it works:** a background watcher checks how long since each file was last opened. The longer it's been, the worse the icon gets, in four stages — fresh, spotty, moldy, fuzzy. Open the window to see everything grouped by freshness, with each file's real current icon, and buttons to reveal it in Finder, freeze it so it stops rotting, or toss it to the Trash.
 
-![Finder window showing fresh, moldy, and fuzzy icons side by side](Screenshots/finder.png)
+---
 
 ## Status
 
-Built and verified on a real Mac. Every claim below has been exercised and
-confirmed working, not assumed. See `UNCERTAINTIES.md` for the full list of
-originally-blind assumptions and what was actually found when each was
-checked, and `DECISIONS.md` for one significant design change made after
-testing (the UI was originally a menu bar icon; it's a window now).
+Built and verified on a real Mac. See `UNCERTAINTIES.md` for the original blind assumptions and what testing actually found, and `DECISIONS.md` for the significant design change made along the way (the UI was originally a menu bar icon; it's a window now, after the status item never rendered on screen for reasons that were never resolved).
 
 ## Building it
 
-Open `Fridge.xcodeproj` in Xcode and build (⌘B), or from the command line:
+Open `Fridge.xcodeproj` in Xcode and build (⌘B), or:
 
 ```
 xcodebuild -scheme Fridge -configuration Debug build
 ```
 
-No signing certificate is required — it builds and runs ad-hoc signed.
+No signing certificate required — it builds and runs ad-hoc signed.
 
 ## Full Disk Access
 
-Painting a moldy icon onto a file means writing to that file, which macOS
-only allows with Full Disk Access — and it won't prompt for it on its own.
-On first launch, Fridge actually attempts the operation (writes a custom
-icon to a throwaway file in Desktop and checks whether it really worked,
-rather than guessing from some other file's permissions) and, if it
-failed, shows its own panel with a button that opens straight to
-System Settings > Privacy & Security > Full Disk Access. Grant it there.
+Painting a moldy icon means writing to the file, which macOS only allows with Full Disk Access, and won't prompt for on its own. On first launch, Fridge actually attempts the write (to a throwaway file in Desktop) and checks whether it really worked, rather than guessing — if it failed, it shows a panel with a button straight to System Settings > Privacy & Security > Full Disk Access.
 
-Because the app is ad-hoc signed, Xcode assigns it a new signature on
-every rebuild, and macOS ties the Full Disk Access grant to that exact
-signature — so this grant will need to be re-added after each rebuild
-during development. That's expected, not a bug.
+Because the app is ad-hoc signed, Xcode assigns a new signature on every rebuild, and macOS ties the Full Disk Access grant to that exact signature — so this needs re-granting after each rebuild during development. Expected, not a bug.
 
 ## If something goes wrong: Unmold All
 
-Click **Unmold All** at the bottom of the window. It strips the custom
-icon from every file Fridge knows about, restoring each one's original
-icon exactly — confirmed byte-for-byte identical to the original in
-testing. This is the emergency undo.
+**Unmold All**, at the bottom of the window, strips the custom icon from every file Fridge knows about and restores each one's original icon — confirmed byte-for-byte identical to the original in testing. The emergency undo.
 
 ## What's tracked right now
 
-The Watcher is currently pointed at `~/FridgeTest`, a junk folder used for
-development, not the real Downloads/Desktop. Switching it to the real
-folders is the last step before shipping, done as its own single-line
-commit specifically so it's trivial to revert.
+The Watcher points at `~/FridgeTest`, a junk folder used for development — not the real Downloads/Desktop. A real Downloads folder can easily hold 5,000+ files, and pointing the current implementation at one was tried and reverted after it revealed a real risk (see `DECISIONS.md`): an interrupted first scan can leave real files repainted with no ledger record, because the Ledger's clean-icon storage doesn't scale to that size yet. Real folders become available once that's fixed properly.
