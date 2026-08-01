@@ -7,10 +7,6 @@ import os
 /// snapshot (as PNG data) from the Ledger. That is what stops mold-on-mold
 /// sludge — see CLAUDE.md decision #2.
 
-// TIER 2 — UNVERIFIED. Never compiled, never run. Depends on runtime
-// behavior that was not observable when written. Rewrite freely.
-// Do NOT patch symptom-by-symptom.
-// (cacheKey() below is the one Tier 1 exception — pure Data/string logic.)
 
 final class MoldPainter {
 
@@ -26,13 +22,24 @@ final class MoldPainter {
 
     init() {
         for bucket in [Bucket.spotty, .moldy, .fuzzy] {
-            guard let url = Bundle.main.url(forResource: assetName(for: bucket), withExtension: "png"),
-                  let image = NSImage(contentsOf: url)
-            else {
+            // Overlays live in Assets.xcassets, not as loose bundle resources —
+            // NSImage(named:) is what actually finds them. See UNCERTAINTIES.md #6.
+            guard let image = NSImage(named: assetName(for: bucket)) else {
                 log.error("MoldPainter: failed to load overlay asset for \(bucket.rawValue, privacy: .public)")
                 continue
             }
             overlays[bucket] = image
+
+            // TEMPORARY DEBUG — remove once asset-catalog overlay loading is
+            // confirmed on a real Mac (UNCERTAINTIES.md #6). NSImage.size is
+            // point size, not pixel size, so this reads the actual bitmap
+            // representation's pixel dimensions instead.
+            let name = self.assetName(for: bucket)
+            if let rep = image.representations.first {
+                log.debug("MoldPainter: loaded \(name, privacy: .public) — \(rep.pixelsWide, privacy: .public)x\(rep.pixelsHigh, privacy: .public)")
+            } else {
+                log.debug("MoldPainter: loaded \(name, privacy: .public) — no representations found")
+            }
         }
     }
 
