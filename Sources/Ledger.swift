@@ -1,7 +1,5 @@
 import Foundation
 
-// TIER 1 — pure logic, no OS calls. Reviewed but never compiled.
-
 /// Remembers every file we have ever seen.
 ///
 /// This is the single source of truth. If a file is not in here, we have
