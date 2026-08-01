@@ -1,7 +1,5 @@
 # Fridge
 
-fridge :)
-
 A macOS menu-bar app for Downloads and Desktop. Files you don't touch grow
 mold on their icons — right on the icon, in Finder, not a notification. The
 longer a file sits untouched, the worse it looks, in four stages from fresh
