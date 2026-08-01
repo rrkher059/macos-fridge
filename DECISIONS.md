@@ -234,3 +234,43 @@ happen and reminds the user Unmold All reverses it. Persisted via
 `UserDefaults` (`FridgeRealFoldersEnabled`) so the choice survives
 relaunches — `~/FridgeTest` remains the default in the committed code
 for every installation that hasn't explicitly opted in.
+
+## Full-day code review (second pass) — one real bug found and fixed (2026-08-01)
+
+An independent review pass over every diff since the start of this
+session (not just the final-pass changes) found one bug worth fixing
+and one accepted low-severity edge case.
+
+**Fixed:** `IconWriter.apply`'s `setIcon` return value was logged on
+failure but never propagated to callers — `runLoop`, `freeze`, and
+`unmoldAll` all updated the Ledger's bucket/frozen state unconditionally,
+regardless of whether the icon write actually succeeded. Same bug class
+as the `Ledger.register()` fix above, just on the write side instead of
+the snapshot side: a transient `setIcon` failure (locked file, momentary
+TCC hiccup, read-only volume) would make the Ledger believe a file was
+restored/painted/frozen when the on-disk icon never changed, with
+`runLoop`'s "bucket unchanged, skip" logic then never retrying it. Most
+serious for `unmoldAll`, the app's designated emergency undo — a partial
+failure there used to be invisible. Fixed by making `apply` return
+`Bool` and having all three call sites only update Ledger state when it
+returns `true`, logging and leaving state untouched (so it's retried
+later) otherwise. Re-verified afterward against the real running app:
+rebuilt, relaunched, confirmed a file got repainted moldy again on
+launch, clicked Unmold All, confirmed via `GetFileInfo`'s custom-icon
+attribute flag that it cleared on multiple files.
+
+**Accepted, not fixed:** the Full Disk Access probe
+(`canSetIconInProtectedFolder`) creates a throwaway hidden dotfile on
+the real `~/Desktop`, calls `setIcon` on it, and removes it via `defer`
+— this runs on every launch regardless of whether real-folder scanning
+is enabled, since testing FDA meaningfully requires touching an
+actually TCC-protected folder (`~/FridgeTest` isn't one). If the process
+is killed between file creation and the `defer` completing, a stray
+empty hidden file with a custom icon could be left on the real Desktop,
+untracked by the Ledger and unreachable by Unmold All (which only
+touches Ledger paths) or by a future Desktop scan (which skips
+dot-prefixed files). Low real-world severity — an empty throwaway file,
+not a pre-existing user file — and not meaningfully fixable short of not
+testing FDA against a real protected folder at all, which would defeat
+the point of the check. Left as-is; flagged here rather than silently
+ignored.

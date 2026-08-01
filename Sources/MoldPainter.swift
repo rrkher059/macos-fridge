@@ -109,10 +109,17 @@ enum IconWriter {
     ///
     /// Callers are responsible for only ever passing a path already present
     /// in the Ledger; this function has no ledger reference to check with.
-    static func apply(_ image: NSImage?, to path: String) {
+    ///
+    /// Returns whether setIcon actually succeeded. Callers must not update
+    /// Ledger state (bucket, frozen) on a false return — doing so would
+    /// record a change that never actually happened on disk, with no way
+    /// to notice or retry later.
+    @discardableResult
+    static func apply(_ image: NSImage?, to path: String) -> Bool {
         let succeeded = NSWorkspace.shared.setIcon(image, forFile: path, options: [])
         if !succeeded {
             log.error("IconWriter: setIcon returned false for \(path, privacy: .public)")
         }
+        return succeeded
     }
 }

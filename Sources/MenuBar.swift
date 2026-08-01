@@ -138,11 +138,17 @@ final class MenuBarController: NSObject {
             // the file's actual on-disk icon (every future pass would then
             // see newBucket == entry.currentBucket and skip forever).
             if newBucket == .fresh {
-                IconWriter.apply(nil, to: file.path)
-                ledger.updateBucket(path: file.path, to: newBucket)
+                if IconWriter.apply(nil, to: file.path) {
+                    ledger.updateBucket(path: file.path, to: newBucket)
+                } else {
+                    log.error("runLoop: setIcon(nil) failed for \(file.path, privacy: .public) — leaving bucket unchanged so it's retried next pass")
+                }
             } else if let painted = painter.paint(cleanPNG: cleanPNG, bucket: newBucket) {
-                IconWriter.apply(painted, to: file.path)
-                ledger.updateBucket(path: file.path, to: newBucket)
+                if IconWriter.apply(painted, to: file.path) {
+                    ledger.updateBucket(path: file.path, to: newBucket)
+                } else {
+                    log.error("runLoop: setIcon failed for \(file.path, privacy: .public) — leaving bucket unchanged so it's retried next pass")
+                }
             } else {
                 log.error("runLoop: paint failed for \(file.path, privacy: .public), bucket \(newBucket.rawValue, privacy: .public) — leaving unchanged")
             }
@@ -507,8 +513,11 @@ final class MenuBarController: NSObject {
     private func freeze(path: String) {
         guard ledger.entry(for: path) != nil else { return }
         ledger.setFrozen(path: path, frozen: true)
-        ledger.updateBucket(path: path, to: .fresh)
-        IconWriter.apply(nil, to: path)
+        if IconWriter.apply(nil, to: path) {
+            ledger.updateBucket(path: path, to: .fresh)
+        } else {
+            log.error("freeze: setIcon(nil) failed for \(path, privacy: .public) — file is frozen but icon may still show mold")
+        }
 
         do {
             try ledger.save()
@@ -522,8 +531,11 @@ final class MenuBarController: NSObject {
     /// Build and test this FIRST, before pointing the app at any real folder.
     func unmoldAll() {
         for path in ledger.allPaths {
-            IconWriter.apply(nil, to: path)
-            ledger.updateBucket(path: path, to: .fresh)
+            if IconWriter.apply(nil, to: path) {
+                ledger.updateBucket(path: path, to: .fresh)
+            } else {
+                log.error("unmoldAll: setIcon(nil) failed for \(path, privacy: .public) — not marking restored")
+            }
         }
 
         do {
