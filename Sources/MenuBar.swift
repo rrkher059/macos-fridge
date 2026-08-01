@@ -30,11 +30,22 @@ final class MenuBarController: NSObject {
         (.fuzzy, "Fuzzy"),
     ]
 
+    /// Real folders are opt-in — see DECISIONS.md. `~/FridgeTest` stays the
+    /// default scope in the committed code; this flag is the only thing
+    /// that switches a specific installation over to real Downloads +
+    /// Desktop, and it's off until the user explicitly turns it on.
+    private static let realFoldersKey = "FridgeRealFoldersEnabled"
+    private var realFoldersEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.realFoldersKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.realFoldersKey) }
+    }
+
     // MARK: - Lifecycle
 
     func start() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        setUpMainMenu()
 
         let isFirstRun = !FileManager.default.fileExists(atPath: Ledger.storeURL.path)
 
@@ -56,6 +67,7 @@ final class MenuBarController: NSObject {
             presentFirstRunExplainer()
         }
         checkFullDiskAccess()
+        applyRealFoldersScopeIfEnabled()
         presentWindow()
 
         watcher.onResults = { [weak self] files in
@@ -84,6 +96,14 @@ final class MenuBarController: NSObject {
                     continue
                 }
                 ledger.register(path: file.path, cleanIconPNG: cleanPNG, lastUsed: file.lastUsed)
+                // Save the "we know about this file, haven't painted it"
+                // record BEFORE any paint happens below. If we crash between
+                // here and the paint, the worst case is a file the Ledger
+                // thinks is still fresh — harmless. Saving only AFTER
+                // painting (the old order) risked the reverse: a real file
+                // repainted on disk with no Ledger record of it, which
+                // Unmold All can't find. See DECISIONS.md — this happened.
+                saveLedgerCheckpoint(context: "register \(file.path)")
             }
 
             guard let entry = ledger.entry(for: file.path) else { continue }
@@ -94,6 +114,11 @@ final class MenuBarController: NSObject {
             let days = daysOld(since: file.lastUsed)
             let newBucket = bucket(forDaysOld: days)
             guard newBucket != entry.currentBucket else { continue }
+
+            guard let cleanPNG = ledger.cleanIconData(for: file.path) else {
+                log.error("runLoop: could not read clean icon data for \(file.path, privacy: .public), skipping")
+                continue
+            }
 
             // paint() returning nil is only meaningful for .fresh (the
             // "strip back to original" signal). For any other bucket it
@@ -106,12 +131,16 @@ final class MenuBarController: NSObject {
             if newBucket == .fresh {
                 IconWriter.apply(nil, to: file.path)
                 ledger.updateBucket(path: file.path, to: newBucket)
-            } else if let painted = painter.paint(cleanPNG: entry.cleanIconPNG, bucket: newBucket) {
+            } else if let painted = painter.paint(cleanPNG: cleanPNG, bucket: newBucket) {
                 IconWriter.apply(painted, to: file.path)
                 ledger.updateBucket(path: file.path, to: newBucket)
             } else {
                 log.error("runLoop: paint failed for \(file.path, privacy: .public), bucket \(newBucket.rawValue, privacy: .public) — leaving unchanged")
             }
+            // Checkpoint again right after painting, so the new bucket is
+            // durable immediately rather than only at the end of the whole
+            // pass — the other half of the same fix.
+            saveLedgerCheckpoint(context: "paint \(file.path)")
         }
 
         for path in ledger.allPaths where !seenPaths.contains(path) {
@@ -126,13 +155,18 @@ final class MenuBarController: NSObject {
             ledger.forget(path: path)
         }
 
+        saveLedgerCheckpoint(context: "end of pass")
+        refreshWindowContent()
+    }
+
+    /// Cheap now that Ledger entries don't carry image data — see
+    /// DECISIONS.md. Safe to call after every file during a scan.
+    private func saveLedgerCheckpoint(context: String) {
         do {
             try ledger.save()
         } catch {
-            log.error("runLoop: failed to save ledger: \(error, privacy: .public)")
+            log.error("runLoop: failed to save ledger (\(context, privacy: .public)): \(error, privacy: .public)")
         }
-
-        refreshWindowContent()
     }
 
     /// Whole elapsed days since `date`, measured as raw elapsed time rather
@@ -168,28 +202,74 @@ final class MenuBarController: NSObject {
         return png
     }
 
+    // MARK: - Menu bar
+
+    /// Minimal standard menu bar — just enough for Cmd+Q and Cmd+W to work.
+    /// Without this, the app has no menu bar at all (never built one), and
+    /// neither shortcut does anything.
+    private func setUpMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit Fridge", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let fileMenuItem = NSMenuItem()
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        fileMenuItem.submenu = fileMenu
+        mainMenu.addItem(fileMenuItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
     // MARK: - Window
 
     private func presentWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 720),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Fridge"
-        window.center()
         window.isReleasedWhenClosed = false
+        // Remembers size and position across launches under this name;
+        // falls back to centering only the very first time, when there's
+        // nothing saved yet.
+        window.setFrameAutosaveName("FridgeMainWindow")
+        if window.setFrameUsingName("FridgeMainWindow") == false {
+            window.center()
+        }
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        // A plain NSClipView is not flipped, so content shorter than the
+        // visible area anchors to the bottom-left, leaving a gap ABOVE the
+        // first row instead of below the last one — confirmed visually
+        // (the gap persisted at the same size regardless of how much
+        // content was in the grid). A flipped clip view anchors from the
+        // top instead, which is what every row-list UI actually wants.
+        scrollView.contentView = FlippedClipView()
         self.scrollView = scrollView
 
         let unmoldButton = ClosureButton(title: "Unmold All") { [weak self] in self?.unmoldAll() }
         let refreshButton = ClosureButton(title: "Refresh Now") { [weak self] in self?.watcher.refresh() }
         let quitButton = ClosureButton(title: "Quit Fridge") { NSApp.terminate(nil) }
-        let bottomBar = NSStackView(views: [unmoldButton, refreshButton, quitButton])
+        var bottomBarViews: [NSView] = [unmoldButton, refreshButton, quitButton]
+        if !realFoldersEnabled {
+            var addRealFoldersButton: ClosureButton!
+            addRealFoldersButton = ClosureButton(title: "Add Downloads and Desktop") { [weak self] in
+                if self?.confirmEnableRealFolders() == true {
+                    addRealFoldersButton.isEnabled = false
+                }
+            }
+            bottomBarViews.append(addRealFoldersButton)
+        }
+        let bottomBar = NSStackView(views: bottomBarViews)
         bottomBar.orientation = .horizontal
         bottomBar.spacing = 8
 
@@ -232,6 +312,17 @@ final class MenuBarController: NSObject {
 
     private func refreshWindowContent() {
         guard let scrollView else { return }
+
+        guard !ledger.allPaths.isEmpty else {
+            let emptyView = buildEmptyStateView()
+            scrollView.documentView = emptyView
+            NSLayoutConstraint.activate([
+                emptyView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+                emptyView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+            ])
+            return
+        }
+
         let grid = buildGrid()
         scrollView.documentView = grid
         NSLayoutConstraint.activate([
@@ -239,6 +330,25 @@ final class MenuBarController: NSObject {
             grid.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor, constant: 8),
             grid.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor, constant: -8),
         ])
+    }
+
+    /// "Nothing rotting" — centered in the whole visible area, not a stray
+    /// left-aligned line in an otherwise-empty white void.
+    private func buildEmptyStateView() -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = NSTextField(labelWithString: "Nothing rotting. Your fridge is clean.")
+        label.textColor = .secondaryLabelColor
+        label.font = .systemFont(ofSize: 14)
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+        ])
+        return container
     }
 
     /// One NSGridView for the whole list — a bucket's rows plus its header
@@ -268,7 +378,7 @@ final class MenuBarController: NSObject {
             guard !inBucket.isEmpty else { continue }
             wroteAnyRow = true
 
-            let header = NSTextField(labelWithString: "\(title) — \(inBucket.count)")
+            let header = NSTextField(labelWithString: "\(title) (\(inBucket.count))")
             header.font = .boldSystemFont(ofSize: 12)
             header.textColor = .secondaryLabelColor
             let headerRow = grid.addRow(with: [header])
@@ -439,6 +549,35 @@ final class MenuBarController: NSObject {
         NSApp.terminate(nil)
     }
 
+    // MARK: - Real folders (opt-in)
+
+    /// `~/FridgeTest` is the default in the committed code, always. This
+    /// only switches a specific installation over, and only after the user
+    /// has explicitly agreed via confirmEnableRealFolders() below.
+    private func applyRealFoldersScopeIfEnabled() {
+        guard realFoldersEnabled else { return }
+        watcher.scopes = [
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads", isDirectory: true),
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop", isDirectory: true),
+        ]
+    }
+
+    /// Returns true if the user confirmed and real folders are now enabled.
+    private func confirmEnableRealFolders() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Watch Downloads and Desktop instead of the test folder?"
+        alert.informativeText = "Fridge will start repainting icons of files older than two weeks in your real Downloads and Desktop folders. A folder with thousands of files can take a while the first time. Unmold All, at the bottom of this window, reverses it at any point."
+        alert.addButton(withTitle: "Add Downloads and Desktop")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.level = .floating
+        guard alert.runModal() == .alertFirstButtonReturn else { return false }
+
+        realFoldersEnabled = true
+        applyRealFoldersScopeIfEnabled()
+        watcher.refresh()
+        return true
+    }
+
     // MARK: - Permissions
 
     /// Full Disk Access is required because setIcon writes to the file.
@@ -497,6 +636,13 @@ final class MenuBarController: NSObject {
         let probeIcon = NSWorkspace.shared.icon(forFile: probe.path)
         return NSWorkspace.shared.setIcon(probeIcon, forFile: probe.path, options: [])
     }
+}
+
+/// A clip view that anchors its document's top-left to the visible area's
+/// top-left, so a document shorter than the scroll view sits flush against
+/// the top instead of leaving an empty gap there.
+private final class FlippedClipView: NSClipView {
+    override var isFlipped: Bool { true }
 }
 
 /// A plain NSButton that runs a captured closure instead of needing a
