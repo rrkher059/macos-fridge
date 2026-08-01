@@ -40,6 +40,21 @@ final class LedgerTests: XCTestCase {
         }
         if let backupData {
             try backupData.write(to: ledgerURL, options: .atomic)
+            // Restoring the real ledger and reloading it sweeps any
+            // icon files this test created that the real ledger (now
+            // restored) doesn't reference — see Ledger.load()'s orphan
+            // sweep.
+            try Ledger().load()
+        } else {
+            // No real ledger existed before this test — nothing to
+            // preserve, so just clear whatever icon files the test made.
+            if let contents = try? FileManager.default.contentsOfDirectory(
+                at: Ledger.iconsDirectory, includingPropertiesForKeys: nil
+            ) {
+                for url in contents {
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
         }
         try super.tearDownWithError()
     }
@@ -83,7 +98,7 @@ final class LedgerTests: XCTestCase {
             return XCTFail("expected entry to survive a save/load round trip")
         }
 
-        XCTAssertEqual(loaded.cleanIconPNG, iconBytes)
+        XCTAssertEqual(reader.cleanIconData(for: path), iconBytes)
         XCTAssertEqual(loaded.lastUsed, lastUsed)
         XCTAssertEqual(loaded.currentBucket, .moldy)
         XCTAssertEqual(loaded.frozen, false)
@@ -127,7 +142,7 @@ final class LedgerTests: XCTestCase {
             return XCTFail("entry disappeared after a redundant register() call")
         }
 
-        XCTAssertEqual(unchanged.cleanIconPNG, original.cleanIconPNG)
+        XCTAssertEqual(ledger.cleanIconData(for: path), firstIcon, "redundant register() must not overwrite the original clean icon")
         XCTAssertEqual(unchanged.lastUsed, original.lastUsed)
         XCTAssertEqual(unchanged.currentBucket, original.currentBucket)
         XCTAssertEqual(unchanged.frozen, original.frozen)

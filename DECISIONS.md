@@ -66,7 +66,7 @@ demo insurance, now the only UI) showing the same Ledger data — grouped
 by bucket, real per-file icons, relative timestamps, Reveal in
 Finder/Freeze/Toss per row, Unmold All/Refresh Now/Quit globally.
 
-## Window reopen via Dock icon — implemented, not fully re-verified (2026-08-01)
+## Window reopen via Dock icon — implemented and verified safely (2026-08-01)
 
 A Phase 2 code review caught a real dead end: with the menu bar gone and
 `LSUIElement` now `NO`, closing the window (red button) left no way to
@@ -90,13 +90,18 @@ is unusual enough that it may be an artifact of that specific automation
 path rather than something a real user would ever trigger by actually
 clicking the close button.
 
-**Not fully re-verified as a result.** The fix itself is a standard,
-widely-used pattern and the code is straightforward, but the actual
-close-then-reopen cycle should be manually verified by clicking the red
-close button and then the Dock icon, watching Activity Monitor briefly
-afterward, before fully trusting it — rather than re-attempting automated
-Apple Event-driven testing of window close, which is what triggered the
-spike here.
+**Since verified safely, avoiding that specific automation path.** Closing
+was tested with a genuine synthetic keyboard event (CGEvent posting a real
+Cmd+W key-down/up through the HID event system, the same path a physical
+keypress takes) instead of an Apple Event: window closed cleanly, process
+stayed at 0% CPU. Reopening was tested by invoking `open` on the running
+app a second time — functionally what happens when the Dock icon is
+clicked for an already-running app — and the same window (same
+`CGWindowID`) came back with correct data, process CPU never exceeded
+0.3% across several seconds of observation afterward. Both confirm the
+fix works correctly for the real interaction paths a user would actually
+trigger; whatever caused the earlier spike was specific to the synthetic
+"close window" Apple Event itself, not this code.
 
 ## Watcher reverted back to ~/FridgeTest — real Downloads is not safe yet (2026-08-01)
 
@@ -148,3 +153,84 @@ That's a real design decision (it changes the Ledger JSON shape CLAUDE.md
 specifies), not something to sneak in unilaterally — flagging it here for
 that decision to be made deliberately, rather than the scope being
 switched back to Downloads/Desktop again without it.
+
+## Fuzzy overlay asset had a baked-in opaque checkerboard, not real transparency (2026-08-01)
+
+Found during a visual-quality pass at 1024px: every fuzzy-bucket file
+showed a mold wreath around a completely blank hole where the base file
+icon should have been — not "faint," genuinely nothing, checkerboard
+pattern visible in the exported PNG. Reproduced consistently across
+different files (a `.png`, a `.docx`) and confirmed it wasn't a testing
+artifact by resetting a file's icon to pristine, verifying the reset with
+a direct dump, then running exactly one clean pass and dumping again —
+same result both times, ruling out any accumulated "sludge" from repeated
+manual testing this session.
+
+Root cause, confirmed by sampling raw pixel values: `mold_fuzzy.png`'s
+center region had alpha = 255 (fully opaque) the whole time, painted with
+literal light-gray/white pixel colors that happen to match a design
+tool's on-screen transparency indicator — i.e. the checkerboard had been
+flattened into the actual saved image data instead of being real alpha
+transparency. `composite()`'s logic was never the problem; it was
+faithfully drawing an overlay asset that opaquely covered the clean icon
+underneath by design-file mistake, not by any compositing bug.
+
+Fixed by flood-filling from the image center, converting every
+connected low-saturation/light pixel (matching the two checkerboard
+colors sampled directly) to alpha 0, stopping naturally at the wreath's
+real artwork (saturated greens/browns, which don't match the flood-fill's
+criteria). Verified the fix by re-sampling the same pixel coordinates
+(alpha now 0) and by a fresh single-pass composite showing the real file
+icon clearly through the hole. `mold_spotty.png` and `mold_moldy.png`
+were checked for the same defect and don't have it — this was
+fuzzy-specific.
+
+## Ledger scaling rewrite — landed (2026-08-01)
+
+The fix the previous entry called for. Clean icons are now individual PNG
+files in `~/Library/Application Support/Fridge/icons/`, named by a SHA256
+hash of the tracked path (`CryptoKit`, stable across launches — unlike
+`Data.hashValue`, which is process-randomized). `LedgerEntry` stores only
+`cleanIconFilename`; `Ledger.cleanIconData(for:)` reads the PNG back on
+demand. `Ledger.load()` sweeps any icon file no surviving entry
+references.
+
+Measured directly, not estimated: the same 16 real-ish test files that
+produced a 2.5MB `ledger.json` under the old inline-base64 format now
+produce a 5KB one — roughly 500x smaller. Extrapolated to the 5,106-file
+real Downloads folder from the previous incident, that's the difference
+between a ~1.1GB ledger and one comfortably under 2MB.
+
+`runLoop` now saves the Ledger after registering a new file (before any
+paint happens) and again immediately after painting, rather than once at
+the end of the entire pass — cheap and safe now that entries carry no
+image data. This directly fixes the reproduced bug: a crash between
+"we know about this file" and "we painted it" now leaves an unpainted,
+harmless record instead of a painted file with no record. Explicitly
+NOT implemented as "detect an interrupted scan and offer to resume" —
+with per-file checkpointing, there's no separate interrupted-scan state
+left to detect; the Ledger is simply always current as of the last file
+processed.
+
+Verified byte-identical `unmoldAll` restoration against the new format
+directly: applied mold via the real running app, clicked "Unmold All" via
+a genuine synthetic mouse click (`CGEvent`, not the AppleScript/Apple
+Event path that caused problems earlier), and confirmed the restored
+icon's PNG bytes matched the stored clean-icon file exactly. All Tier 1
+tests updated for the new `LedgerEntry` shape and passing.
+
+**Cut for time, deliberately:** batched processing with a visible
+"Scanning N of M" progress indicator, and progressively populating the
+window as files are processed rather than all at once at the end. The
+per-file checkpointing above already means no work or Ledger state is
+ever lost if a long scan is interrupted — the UI just doesn't show
+progress during one. Worth adding before ever turning on real folders by
+default for a folder anyone actually complained was slow.
+
+**Landed:** a real "Add Downloads and Desktop" opt-in button in the
+window's bottom bar (only shown while real folders aren't enabled),
+gated behind a confirmation alert that states plainly what's about to
+happen and reminds the user Unmold All reverses it. Persisted via
+`UserDefaults` (`FridgeRealFoldersEnabled`) so the choice survives
+relaunches — `~/FridgeTest` remains the default in the committed code
+for every installation that hasn't explicitly opted in.
